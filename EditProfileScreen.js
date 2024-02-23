@@ -1,86 +1,80 @@
-import { React, useState } from "react";
-import { View, TextInput, StyleSheet, Text, Alert } from "react-native";
-import { getAuth, updateProfile } from "firebase/auth";
-import { TouchableOpacity } from "react-native-gesture-handler";
+import React, { useState, useEffect } from "react";
+import { View, TextInput, StyleSheet, Text, Alert, TouchableOpacity } from "react-native";
+import { getAuth, updateProfile, updateEmail } from "firebase/auth";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "./firebaseConfig"; // Make sure this is correctly pointing to your Firebase config
 
 const EditProfileScreen = () => {
-  const [name, setName] = useState('');                // For new name from user input
-  const [email, setEmail] = useState('');              // For new email form user input
-  const [phoneNumber, setPhoneNumber] = useState('');  // For new phone number from user input
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [originalEmail, setOriginalEmail] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const handleMakeChanges = () => {
-    // Firebase "Update a user's profile"
-    // Fount @ Docs > Build > Authentication > Web > Manage Users
-    const auth = getAuth();
-    if (name != '') {
-      updateProfile(auth.currentUser, {
-        displayName: name
-      }).then(() => {
-        Alert.alert('Success');
-      }).catch((error) => {
-        Alert.alert("Failure", error.message);
-      })
-    }
-    if (email != '') {
-      updateProfile(auth.currentUser, {
-        email: email
-      }).then(() => {
-        Alert.alert('Success');
-      }).catch((error) => {
-        Alert.alert("Failure", error.message);
-      })
-    }
-    if (phoneNumber != '') {
-      updateProfile(auth.currentUser, {
-        phoneNumber: phoneNumber
-      }).then(() => {
-        Alert.alert('Success');
-      }).catch((error) => {
-        Alert.alert("Failure", error.message);
-      })
-    }
+  const auth = getAuth();
+  const user = auth.currentUser;
 
-    // updateProfile(auth.currentUser, {
-    //   // Use the values from the user input
-    //   displayName: {name},
-    //   email: {email},
-    //   phoneNumber: {phoneNumber}
-    // }).then( () => {
-         // "Profile Updated"
-    // }).catch((error) => { 
-         // "An error occured"
-    // });
+  useEffect(() => {
+    if (user) {
+      // Set initial values from auth
+      setDisplayName(user.displayName || "");
+      setEmail(user.email || "");
+      setOriginalEmail(user.email || "");
+      setLoading(false);
+    }
+  }, [user]);
+
+  const handleUpdate = async () => {
+    try {
+      setLoading(true);
+      if (displayName !== user.displayName) {
+        await updateProfile(user, { displayName });
+      }
+      if (email !== originalEmail) {
+        await updateEmail(user, email);
+      }
+      // Update Firestore if needed. Assume we have a users collection
+      const userRef = doc(db, "MANAGERS", user.uid);
+      await updateDoc(userRef, {
+        displayName,
+        email,
+        // Add any other user fields you might want to update
+      });
+
+      Alert.alert("Success", "Profile updated successfully.");
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Profile Update Error", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading...</Text>
+      </View>
+    );
   }
 
   return (
-    <View style={styles.container}> 
+    <View style={styles.container}>
       <Text style={styles.title}>Edit Profile</Text>
       <TextInput
         style={styles.input}
-        placeholder="Name"
-        placeholderTextColor="#666"
-        onChangeText={setName}
-        value={name}
-        autoCapitalize="none"
+        placeholder="Display Name"
+        value={displayName}
+        onChangeText={setDisplayName}
       />
       <TextInput
         style={styles.input}
         placeholder="Email"
-        placeholderTextColor="#666"
-        onChangeText={setEmail}
         value={email}
-        autoCapitalize="none"
+        onChangeText={setEmail}
+        keyboardType="email-address"
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Phone Number"
-        placeholderTextColor="#666"
-        onChangeText={setPhoneNumber}
-        value={phoneNumber}
-        autoCapitalize="none"
-      />
-      <TouchableOpacity style={styles.button} onPress={handleMakeChanges}>
-        <Text>Submit Changes</Text>
+      <TouchableOpacity style={styles.button} onPress={handleUpdate} disabled={loading}>
+        <Text style={styles.buttonText}>Save Changes</Text>
       </TouchableOpacity>
     </View>
   );
@@ -88,36 +82,32 @@ const EditProfileScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 50,
     flex: 1,
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
   title: {
-    fontSize:30,
-    fontWeight: 'bold',
-    textAlign:'center',  // Center the title 
-    lineHeight: 60
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
   },
   input: {
-    width: 300,
-    height: 50,
-    borderColor: '#ddd',
+    width: "100%",
     borderWidth: 1,
+    borderColor: "#ccc",
     borderRadius: 5,
-    marginTop: 15,
+    padding: 10,
     marginBottom: 15,
-    paddingLeft: 15,
   },
   button: {
-    height: 50,
-    width: 150,
-    backgroundColor: '#e74c3c',
-    padding: 15,
+    backgroundColor: "#007bff",
+    padding: 10,
     borderRadius: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft:30,
-  }
-})
+  },
+  buttonText: {
+    color: "#ffffff",
+  },
+});
 
 export default EditProfileScreen;
